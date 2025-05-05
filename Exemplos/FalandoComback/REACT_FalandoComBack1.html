@@ -1,57 +1,122 @@
 <!DOCTYPE html>
 <html>
-	<head>
-	  	<script src="https://unpkg.com/react@17/umd/react.development.js" ></script>
-		<script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js" ></script>
-		<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-	</head>
-	<body ng-app="myApp">
-		<h1>REACT Front-End: </h1>
-        <div id="saida"></div>
+  <head>
+    <script src="https://unpkg.com/react@17/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  </head>
+  <body>
+    <div id="saida"></div>
 
-		<script type="text/babel">
-			class GetRequest extends React.Component {
-				constructor(props) {
-					super(props);
-					this.state = {
-						resposta: null
-					};
-					this.getBackEnd = this.getBackEnd.bind(this);
-				}
+    <script type="text/babel">
+      class CepForm extends React.Component {
+        constructor(props) {
+          super(props);
+          this.state = {
+            cep: '',
+            resultado: null,
+            error: null,
+            loading: false // Adicionamos estado de loading
+          };
+          this.handleChange = this.handleChange.bind(this);
+          this.handleSubmit = this.handleSubmit.bind(this);
+        }
 
-				getBackEnd() {
-					// Simple GET Request - removing Content-Type might help avoid preflight for GET
-					fetch('http://localhost:3000/teste')
-						.then(response => {
-							if (!response.ok) {
-								throw new Error(`HTTP error! status: ${response.status}`);
-							}
-							return response.text(); // Expecting plain text from your backend
-						})
-						.then(data => this.setState({ resposta: data }))
-						.catch(error => {
-							console.error("Fetch error:", error);
-							this.setState({ resposta: 'Erro ao buscar dados' });
-						});
-				}
+        handleChange(event) {
+          this.setState({cep: event.target.value});
+        }
 
-				render() {
-					const { resposta } = this.state;
-					return (
-						<div >
-							<h5> Simple GET Request</h5>
-							<button type="button" onClick={this.getBackEnd}> Pegar Dados </button>
-							<br />
-							<br />
-							<div>
-								Retornado: {this.state.resposta}
-							</div>
-						</div>
-					);
-				}
-			}
+        async handleSubmit(event) {
+          event.preventDefault();
+          const { cep } = this.state;
+          const cepNumerico = cep.replace(/\D/g, '');
+          
+          if (cepNumerico.length !== 8) {
+            this.setState({error: 'CEP deve conter 8 dígitos', resultado: null});
+            return;
+          }
 
-			ReactDOM.render(<GetRequest />,document.getElementById('saida'));
-		</script>
-	</body>
+          this.setState({loading: true, error: null});
+          
+          try {
+            // Faz a requisição para nosso back-end que vai consultar a API ViaCEP
+            const response = await fetch(`http://localhost:3000/cep/${cepNumerico}`);
+            
+            if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(errorData.error || 'Erro ao buscar CEP');
+            }
+            
+            const data = await response.json();
+            this.setState({
+              resultado: data,
+              error: null
+            });
+          } catch (error) {
+            this.setState({
+              error: error.message,
+              resultado: null
+            });
+          } finally {
+            this.setState({loading: false});
+          }
+        }
+
+        render() {
+          const { cep, resultado, error, loading } = this.state;
+          
+          return (
+            <div style={{padding: '20px', maxWidth: '500px', margin: '0 auto'}}>
+              <h1>Consulta de CEP</h1>
+              <form onSubmit={this.handleSubmit} style={{marginBottom: '20px'}}>
+                <div style={{marginBottom: '10px'}}>
+                  <label>
+                    Digite o CEP (apenas números):
+                    <input 
+                      type="text" 
+                      value={cep}
+                      onChange={this.handleChange}
+                      placeholder="Ex: 01001000"
+                      style={{marginLeft: '10px', padding: '5px'}}
+                    />
+                  </label>
+                </div>
+                <button 
+                  type="submit" 
+                  disabled={loading}
+                  style={{padding: '5px 15px', cursor: 'pointer'}}
+                >
+                  {loading ? 'Buscando...' : 'Consultar'}
+                </button>
+              </form>
+              
+              {error && (
+                <div style={{color: 'red', margin: '10px 0'}}>
+                  Erro: {error}
+                </div>
+              )}
+              
+              {resultado && (
+                <div style={{
+                  border: '1px solid #ccc',
+                  padding: '15px',
+                  borderRadius: '5px',
+                  backgroundColor: '#f9f9f9'
+                }}>
+                  <h2>Dados do CEP:</h2>
+                  <p><strong>CEP:</strong> {resultado.cep}</p>
+                  <p><strong>Logradouro:</strong> {resultado.logradouro || 'Não informado'}</p>
+                  <p><strong>Bairro:</strong> {resultado.bairro || 'Não informado'}</p>
+                  <p><strong>Cidade:</strong> {resultado.localidade}</p>
+                  <p><strong>Estado:</strong> {resultado.uf}</p>
+                </div>
+              )}
+            </div>
+          );
+        }
+      }
+
+      ReactDOM.render(<CepForm />, document.getElementById('saida'));
+    </script>
+  </body>
 </html>
