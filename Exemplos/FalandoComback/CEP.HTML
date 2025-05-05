@@ -1,27 +1,94 @@
 <!DOCTYPE html>
 <html>
   <head>
-	<script src="https://unpkg.com/react@16/umd/react.production.min.js"></script>
-	<script src="https://unpkg.com/react-dom@16/umd/react-dom.production.min.js"></script>
-	<script src="https://unpkg.com/babel-standalone@6.15.0/babel.min.js"></script>
+    <script src="https://unpkg.com/react@16/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@16/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/babel-standalone@6.15.0/babel.min.js"></script>
   </head>
   <body>
     <div id="app"></div>
 
     <script type="text/babel">
-		class MyForm extends React.Component {
-		  render() {
-			return (
-			  <form>
-				<h1>Ola!</h1>
-				<p>Informe um CEP:</p>
-				<input type="text"/>
-				<input type="submit" value="Submit" />
-			  </form>
-			);
-		  }
-		}
-		ReactDOM.render(<MyForm />, document.getElementById('app'));
+      class MyForm extends React.Component {
+        constructor(props) {
+          super(props);
+          this.state = {
+            cep: '',
+            resultado: null,
+            error: null
+          };
+          this.handleChange = this.handleChange.bind(this);
+          this.handleSubmit = this.handleSubmit.bind(this);
+        }
+
+        handleChange(event) {
+          this.setState({cep: event.target.value});
+        }
+
+        handleSubmit(event) {
+          event.preventDefault();
+          const { cep } = this.state;
+          
+          // Remove qualquer caractere não numérico
+          const cepNumerico = cep.replace(/\D/g, '');
+          
+          if (cepNumerico.length !== 8) {
+            this.setState({error: 'CEP deve conter 8 dígitos'});
+            return;
+          }
+
+          fetch(`https://viacep.com.br/ws/${cepNumerico}/json/`)
+            .then(response => response.json())
+            .then(data => {
+              if (data.erro) {
+                this.setState({error: 'CEP não encontrado', resultado: null});
+              } else {
+                this.setState({
+                  resultado: data,
+                  error: null
+                });
+              }
+            })
+            .catch(error => {
+              this.setState({error: 'Erro ao buscar CEP', resultado: null});
+            });
+        }
+
+        render() {
+          const { cep, resultado, error } = this.state;
+          
+          return (
+            <div>
+              <form onSubmit={this.handleSubmit}>
+                <h1>Olá!</h1>
+                <p>Informe um CEP:</p>
+                <input 
+                  type="text" 
+                  value={cep}
+                  onChange={this.handleChange}
+                  placeholder="Ex: 01002000"
+                />
+                <input type="submit" value="Enviar" />
+              </form>
+              
+              {error && <p style={{color: 'red'}}>{error}</p>}
+              
+              {resultado && (
+                <div>
+                  <h2>Resultado:</h2>
+                  <p>CEP: {resultado.cep}</p>
+                  <p>Logradouro: {resultado.logradouro}</p>
+                  <p>Bairro: {resultado.bairro}</p>
+                  <p>Cidade: {resultado.localidade}</p>
+                  <p>Estado: {resultado.uf}</p>
+                </div>
+              )}
+            </div>
+          );
+        }
+      }
+      
+      ReactDOM.render(<MyForm />, document.getElementById('app'));
     </script>
   </body>
 </html>
